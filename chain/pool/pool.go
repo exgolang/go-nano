@@ -1,0 +1,5 @@
+package pool
+
+func Master() {
+
+}
