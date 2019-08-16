@@ -30,6 +30,11 @@ First task:
 * Generate new genesis and accounts genesis. ✓
 * Blockchain, insert genesis block, validation hash block, mempool and commit to leveldb. ⟳
 
+Contact: 
+
+* Telegram: @golangmaster
+* Gmail: express.phpcode@gmail.com
+
 Donate:
 
 * BTC: 3KfhykromExJNoyJ65B43jjwL72fdsfhSS 
