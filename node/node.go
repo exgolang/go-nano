@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Components struct.
 type Components struct {
 	Db  *leveldb.DB
 	Cmd *types.Cmd
@@ -22,8 +23,8 @@ type Components struct {
 
 func Master(db *leveldb.DB, cmd *types.Cmd) *Components {
 
-	if cmd.Genesis {
-		gen.Master(cmd.Coint)
+	if cmd.Genesis.New {
+		gen.New(cmd.Genesis.Coint, db)
 	}
 
 	return &Components{
@@ -83,7 +84,7 @@ func (n *Components) Running() {
 		transfer types.Transfer
 	)
 
-	for j = 0; j < 50; i++ {
+	for j = 0; j < 20; i++ {
 
 		blockchain, err := block.Master(n.Db)
 		if err != nil {

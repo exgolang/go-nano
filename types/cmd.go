@@ -4,6 +4,8 @@ type Cmd struct {
 	Host    string
 	Port    int
 	Network string
-	Genesis bool
-	Coint   int
+	Genesis struct {
+		New   bool
+		Coint int
+	}
 }

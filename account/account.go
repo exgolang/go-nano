@@ -88,7 +88,4 @@ func Master(mnemonic, passphrase string) (*Account, error) {
 func (p *Account) Address() string { return p._Address }    // Account address.
 func (p *Account) Private() string { return p._PrivateKey } // Account private key
 func (p *Account) Public() string  { return p._PublicKey }  // Account public key.
-
-func (p *Account) Value() {
-
-}
+func (p *Account) Value()          {}

@@ -40,3 +40,11 @@
 [[constraint]]
   name = "github.com/tyler-smith/go-bip39"
   version = "1.0.2"
+
+[[constraint]]
+  name = "github.com/davecgh/go-spew"
+  version = "1.1.1"
+
+[[constraint]]
+  name = "github.com/mitchellh/mapstructure"
+  version = "1.1.2"

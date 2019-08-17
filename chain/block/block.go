@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"sync"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/exgolang/go-nano/types"
 	//"github.com/davecgh/go-spew/spew"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -16,53 +18,51 @@ import (
 )
 
 const (
-	GenesisPrevHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+	DefaultPrevHash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+	//DefaultCurrentHash = "0x1691dfefc0f405bd38d13f51b895ef7a643b88c4ccc3fce3151aeacc6f6520ab"
 )
-
-// Block interface.
-type Interface interface {
-	Hash(block types.Block) (string, error)
-}
 
 var (
 	// Block index already exists.
-	//ErrIndexAlready = errors.New("block index already exists: block.go")
+	ErrIndexAlready = errors.New("block index already exists")
 
 	// The original hash of the previous block matches the hash of the new block.
-	ErrPreviousHash = errors.New("the original hash of the previous block matches the hash of the new block: block.go")
+	ErrPreviousHash = errors.New("the original hash of the previous block matches the hash of the new block")
 
 	// Invalid block indexing.
-	ErrInvalidIndexing = errors.New("invalid block indexing: block.go")
+	ErrInvalidIndexing = errors.New("invalid block indexing")
 
 	// Invalid block hash.
-	ErrInvalidBlockHash = errors.New("invalid block hash: block.go")
+	ErrInvalidBlockHash = errors.New("invalid block hash")
 )
 
 // Components struct.
 type Components struct {
 	Db      *leveldb.DB
 	Collect types.Block
+	Mutex   sync.Mutex
+}
+
+type Colum struct {
+	Index int
+	Hash  string
 }
 
 // Master create block.
 func Master(db *leveldb.DB) (*Components, error) {
 
-	var (
-		prev, current types.Block
-	)
+	var prev, current types.Block
 
 	iterator := db.NewIterator(util.BytesPrefix([]byte("block-")), nil)
-	if iterator.Next() {
+	if iterator.Last() {
 
 		if err := json.Unmarshal(iterator.Value(), &prev); err != nil {
 			return nil, err
 		}
-
 		current.Index, current.Prev = prev.Index+1, prev.Current
-	} else {
-		current.Index, current.Prev = 0, GenesisPrevHash
+
 	}
-	iterator.Release() // Note: you should first get data and then release iterator
+	iterator.Release()
 
 	if err := iterator.Error(); err != nil {
 		return nil, err
@@ -78,43 +78,43 @@ func Master(db *leveldb.DB) (*Components, error) {
 // Commit new block.
 func (c *Components) Commit() error {
 
-	//spew.Dump(c.Collect.Index)
+	spew.Dump(c.Collect.Index)
 
-	//index := append([]byte("block-"), []byte(strconv.Itoa(c.Collect.Index))...)
-	//if b, err := c.Db.Has(index, nil); !b {
-	//	if err != nil {
-	//		return err
-	//	}
+	index := append([]byte("block-"), []byte(strconv.Itoa(c.Collect.Index))...)
+	if b, err := c.Db.Has(index, nil); !b {
+		if err != nil {
+			return err
+		}
 
-	if _, err := c.Hash(types.Block{}); err != nil {
-		return err
+		if _, err := c.Hash(types.Block{}, false); err != nil {
+			return err
+		}
+
+		//if err := c.isValidate(); err != nil {
+		//	return err
+		//}
+
+		block, err := json.Marshal(c.Collect)
+		if err != nil {
+			return err
+		}
+
+		if err = c.Db.Put(append([]byte("block-"), []byte(strconv.Itoa(c.Collect.Index))...), block, nil); err != nil {
+			return err
+		}
+
+		log.WithFields(log.Fields{
+			"index":     c.Collect.Index,
+			"prev":      c.Collect.Prev,
+			"current":   c.Collect.Current,
+			"trx-count": len(c.Collect.Transactions),
+		}).Info("Commit block successful")
+
+		return nil
+
+	} else {
+		return ErrIndexAlready
 	}
-
-	//if err := c.isValidate(); err != nil {
-	//	return err
-	//}
-
-	block, err := json.Marshal(c.Collect)
-	if err != nil {
-		return err
-	}
-
-	if err = c.Db.Put(append([]byte("block-"), []byte(strconv.Itoa(c.Collect.Index))...), block, nil); err != nil {
-		return err
-	}
-
-	log.WithFields(log.Fields{
-		"index":     c.Collect.Index,
-		"prev":      c.Collect.Prev,
-		"current":   c.Collect.Current,
-		"trx-count": len(c.Collect.Transactions),
-	}).Info("Commit block successful")
-
-	return nil
-
-	//} else {
-	//	return ErrIndexAlready
-	//}
 
 }
 
@@ -141,7 +141,7 @@ func (c *Components) isValidate() error {
 			return ErrInvalidIndexing
 		}
 
-		if current, _ := c.Hash(types.Block{}); c.Collect.Current != current {
+		if current, _ := c.Hash(types.Block{}, false); c.Collect.Current != current {
 			return ErrInvalidBlockHash
 		}
 
@@ -152,14 +152,14 @@ func (c *Components) isValidate() error {
 }
 
 // Hashed block.
-func (c *Components) Hash(block types.Block) (string, error) {
+func (c *Components) Hash(block types.Block, remission bool) (string, error) {
 
 	var (
 		appends []byte
 	)
 
 	current := new(types.Block)
-	if block.Index > 0 {
+	if remission {
 		current = &block
 	} else {
 		current = &c.Collect
@@ -170,7 +170,7 @@ func (c *Components) Hash(block types.Block) (string, error) {
 		return "", err
 	}
 
-	//c.Mutex.Lock()
+	c.Mutex.Lock()
 
 	appends = append(appends, trx...)
 	appends = append(appends, []byte(strconv.Itoa(current.Index))...)
@@ -178,7 +178,7 @@ func (c *Components) Hash(block types.Block) (string, error) {
 	appends = append(appends, []byte(strconv.Itoa(current.Fees))...)
 	appends = append(appends, []byte(current.Prev)...)
 
-	//c.Mutex.Unlock()
+	c.Mutex.Unlock()
 
 	h := sha256.New()
 	h.Write(appends)
