@@ -209,6 +209,7 @@ func New(coint int, db *leveldb.DB) {
 		}
 
 		log.Info("Generated genesis successful!.")
+
 	} else {
 
 		serialize, err := ioutil.ReadFile("genesis.json")
